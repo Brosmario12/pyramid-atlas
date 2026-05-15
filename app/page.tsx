@@ -1,9 +1,8 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
-import { BarChart3, Globe2, Mountain, Route } from "lucide-react";
+import { BusFront, MapPinned, Radio, Route } from "lucide-react";
 import {
   Bar,
   BarChart,
@@ -13,93 +12,115 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { buildDistanceMatrix } from "@/lib/geo";
-import type { Pyramid } from "@/lib/types";
+import { routeKinds } from "@/lib/binnibus";
+import type { BusRoute, RouteKind, VehiclePosition } from "@/lib/types";
 
-const PyramidMap = dynamic(() => import("@/components/pyramid-map"), {
+const TransitMap = dynamic(() => import("@/components/transit-map"), {
   ssr: false,
 });
 
 export default function Home() {
-  const [pyramids, setPyramids] = useState<Pyramid[]>([]);
-  const [selectedCountry, setSelectedCountry] = useState("Todos");
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [routes, setRoutes] = useState<BusRoute[]>([]);
+  const [vehicles, setVehicles] = useState<VehiclePosition[]>([]);
+  const [selectedKind, setSelectedKind] = useState<RouteKind | "Todas">("Todas");
+  const [selectedRouteId, setSelectedRouteId] = useState<string | null>(null);
 
   useEffect(() => {
-    fetch("/api/pyramids")
+    fetch("/api/routes")
       .then((response) => response.json())
-      .then((data: Pyramid[]) => {
-        setPyramids(data);
-        setSelectedId(data[0]?.id ?? null);
+      .then((data: BusRoute[]) => {
+        setRoutes(data);
+        setSelectedRouteId(data[0]?.id ?? null);
       });
   }, []);
 
-  const countries = useMemo(
-    () => ["Todos", ...Array.from(new Set(pyramids.map((item) => item.country)))],
-    [pyramids],
-  );
+  useEffect(() => {
+    const loadVehicles = () =>
+      fetch("/api/vehicles")
+        .then((response) => response.json())
+        .then((data: VehiclePosition[]) => setVehicles(data))
+        .catch(() => setVehicles([]));
 
-  const filteredPyramids = useMemo(
+    loadVehicles();
+    const interval = window.setInterval(loadVehicles, 15000);
+    return () => window.clearInterval(interval);
+  }, []);
+
+  const filteredRoutes = useMemo(
     () =>
-      selectedCountry === "Todos"
-        ? pyramids
-        : pyramids.filter((item) => item.country === selectedCountry),
-    [pyramids, selectedCountry],
+      selectedKind === "Todas"
+        ? routes
+        : routes.filter((route) => route.kind === selectedKind),
+    [routes, selectedKind],
   );
 
-  const selectedPyramid =
-    filteredPyramids.find((item) => item.id === selectedId) ??
-    filteredPyramids[0] ??
+  const selectedRoute =
+    filteredRoutes.find((route) => route.id === selectedRouteId) ??
+    filteredRoutes[0] ??
     null;
 
-  const distances = useMemo(
-    () => buildDistanceMatrix(filteredPyramids),
-    [filteredPyramids],
-  );
-
-  const countryChart = useMemo(() => {
-    const countByCountry = new Map<string, number>();
-    pyramids.forEach((item) => {
-      countByCountry.set(item.country, (countByCountry.get(item.country) ?? 0) + 1);
+  const routeChart = useMemo(() => {
+    const countByKind = new Map<RouteKind, number>();
+    routes.forEach((route) => {
+      countByKind.set(route.kind, (countByKind.get(route.kind) ?? 0) + 1);
     });
 
-    return Array.from(countByCountry.entries()).map(([country, count]) => ({
-      country,
-      count,
+    return routeKinds.map((kind) => ({
+      kind,
+      count: countByKind.get(kind) ?? 0,
     }));
-  }, [pyramids]);
+  }, [routes]);
+
+  const visibleVehicles = useMemo(
+    () =>
+      selectedRoute
+        ? vehicles.filter((vehicle) => vehicle.routeId === selectedRoute.id)
+        : vehicles,
+    [selectedRoute, vehicles],
+  );
+
+  const corridorList = useMemo(
+    () =>
+      filteredRoutes.map((route) => ({
+        id: route.id,
+        label: `${route.code} ${route.name}`,
+        path: `${route.origin} - ${route.destination}`,
+      })),
+    [filteredRoutes],
+  );
 
   return (
-    <main className="atlas-shell">
+    <main className="transit-shell">
       <header className="topbar">
         <div>
-          <p>Atlas global</p>
-          <h1>Pyramid Atlas</h1>
+          <p>Movilidad metropolitana</p>
+          <h1>BinniBus Oaxaca</h1>
         </div>
         <div className="metric-row">
           <span>
-            <Globe2 size={16} />
-            {pyramids.length} sitios
+            <Route size={16} />
+            {routes.length} rutas
           </span>
           <span>
-            <Mountain size={16} />
-            {countries.length - 1} paises
+            <BusFront size={16} />
+            {vehicles.length} unidades visibles
           </span>
         </div>
       </header>
 
       <section className="toolbar">
         <label>
-          Pais
+          Tipo de ruta
           <select
-            value={selectedCountry}
+            value={selectedKind}
             onChange={(event) => {
-              setSelectedCountry(event.target.value);
-              setSelectedId(null);
+              setSelectedKind(event.target.value as RouteKind | "Todas");
+              setSelectedRouteId(null);
             }}
           >
-            {countries.map((country) => (
-              <option key={country}>{country}</option>
+            <option>Todas</option>
+            {routeKinds.map((kind) => (
+              <option key={kind}>{kind}</option>
             ))}
           </select>
         </label>
@@ -107,42 +128,35 @@ export default function Home() {
 
       <section className="main-grid">
         <div className="map-panel">
-          <PyramidMap
-            pyramids={filteredPyramids}
-            selectedId={selectedPyramid?.id ?? null}
-            onSelect={setSelectedId}
+          <TransitMap
+            routes={filteredRoutes}
+            selectedRouteId={selectedRoute?.id ?? null}
+            vehicles={visibleVehicles}
+            onSelectRoute={setSelectedRouteId}
           />
         </div>
 
         <aside className="detail-panel">
-          {selectedPyramid ? (
+          {selectedRoute ? (
             <>
-              <Image
-                src={selectedPyramid.imageUrl}
-                alt={selectedPyramid.name}
-                width={900}
-                height={600}
-                className="detail-image"
-              />
+              <div className="route-chip" style={{ background: selectedRoute.color }} />
               <div className="detail-copy">
-                <p>{selectedPyramid.country}</p>
-                <h2>{selectedPyramid.name}</h2>
+                <p>{selectedRoute.kind}</p>
+                <h2>
+                  {selectedRoute.code} {selectedRoute.name}
+                </h2>
                 <dl>
                   <div>
-                    <dt>Civilizacion</dt>
-                    <dd>{selectedPyramid.civilization}</dd>
+                    <dt>Origen</dt>
+                    <dd>{selectedRoute.origin}</dd>
                   </div>
                   <div>
-                    <dt>Periodo</dt>
-                    <dd>{selectedPyramid.period}</dd>
+                    <dt>Destino</dt>
+                    <dd>{selectedRoute.destination}</dd>
                   </div>
                   <div>
-                    <dt>Altura</dt>
-                    <dd>
-                      {selectedPyramid.heightMeters
-                        ? `${selectedPyramid.heightMeters} m`
-                        : "Sin dato"}
-                    </dd>
+                    <dt>Unidades visibles</dt>
+                    <dd>{visibleVehicles.length}</dd>
                   </div>
                 </dl>
               </div>
@@ -154,43 +168,36 @@ export default function Home() {
       <section className="analytics-grid">
         <article className="analytics-panel">
           <div className="panel-heading">
-            <BarChart3 size={18} />
-            <h2>Sitios por pais</h2>
+            <MapPinned size={18} />
+            <h2>Rutas por tipo</h2>
           </div>
           <ResponsiveContainer width="100%" height={240}>
-            <BarChart data={countryChart}>
+            <BarChart data={routeChart}>
               <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="country" />
+              <XAxis dataKey="kind" />
               <YAxis allowDecimals={false} />
               <Tooltip />
-              <Bar dataKey="count" fill="#1f7a8c" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="count" fill="#0f766e" radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </article>
 
         <article className="analytics-panel">
           <div className="panel-heading">
-            <Route size={18} />
-            <h2>Distancias mas cortas</h2>
+            <Radio size={18} />
+            <h2>Corredores activos</h2>
           </div>
-          <div className="distance-list">
-            {distances.slice(0, 6).map((distance) => {
-              const from = filteredPyramids.find(
-                (item) => item.id === distance.fromId,
-              );
-              const to = filteredPyramids.find(
-                (item) => item.id === distance.toId,
-              );
-
-              return (
-                <div key={`${distance.fromId}-${distance.toId}`}>
-                  <span>
-                    {from?.name} a {to?.name}
-                  </span>
-                  <strong>{distance.kilometers} km</strong>
-                </div>
-              );
-            })}
+          <div className="route-list">
+            {corridorList.map((route) => (
+              <button
+                key={route.id}
+                className={route.id === selectedRoute?.id ? "active" : ""}
+                onClick={() => setSelectedRouteId(route.id)}
+              >
+                <strong>{route.label}</strong>
+                <span>{route.path}</span>
+              </button>
+            ))}
           </div>
         </article>
       </section>

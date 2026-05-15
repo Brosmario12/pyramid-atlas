@@ -1,23 +1,18 @@
-create table if not exists public.pyramids (
+create table if not exists public.binnibus_routes (
   id text primary key,
+  code text not null,
   name text not null,
-  country text not null,
-  region text not null,
-  civilization text not null,
-  period text not null,
-  latitude double precision not null,
-  longitude double precision not null,
-  "elevationMeters" double precision,
-  "heightMeters" double precision,
-  "sourceUrl" text not null,
-  "imageUrl" text not null,
-  "updatedAt" timestamptz not null default now()
+  kind text not null,
+  origin text not null,
+  destination text not null,
+  color text not null,
+  path jsonb not null
 );
 
-alter table public.pyramids enable row level security;
+alter table public.binnibus_routes enable row level security;
 
-create policy "Public read pyramids"
-on public.pyramids
+create policy "Public read binnibus routes"
+on public.binnibus_routes
 for select
 to anon
 using (true);

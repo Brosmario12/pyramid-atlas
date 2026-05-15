@@ -1,21 +1,21 @@
-export type Pyramid = {
+export type RouteKind = "Troncal" | "Complementaria" | "Alimentadora";
+
+export type BusRoute = {
   id: string;
+  code: string;
   name: string;
-  country: string;
-  region: string;
-  civilization: string;
-  period: string;
-  latitude: number;
-  longitude: number;
-  elevationMeters: number | null;
-  heightMeters: number | null;
-  sourceUrl: string;
-  imageUrl: string;
-  updatedAt: string;
+  kind: RouteKind;
+  origin: string;
+  destination: string;
+  color: string;
+  path: [number, number][];
 };
 
-export type PyramidDistance = {
-  fromId: string;
-  toId: string;
-  kilometers: number;
+export type VehiclePosition = {
+  id: string;
+  routeId: string;
+  latitude: number;
+  longitude: number;
+  bearing?: number;
+  updatedAt: string;
 };

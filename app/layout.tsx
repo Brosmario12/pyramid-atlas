@@ -3,8 +3,8 @@ import "leaflet/dist/leaflet.css";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Pyramid Atlas",
-  description: "Atlas global de piramides con mapa satelital y analitica geoespacial.",
+  title: "BinniBus Oaxaca",
+  description: "Mapa de rutas BinniBus Oaxaca con soporte para posiciones en tiempo real.",
 };
 
 export default function RootLayout({
